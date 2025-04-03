@@ -2,6 +2,7 @@ import streamlit as st
 from PIL import Image, ImageDraw
 import tempfile
 from inference_sdk import InferenceHTTPClient
+import time
 
 # --- Replace with your Roboflow API key and model details ---
 ROBOFLOW_API_KEY = "BjCE4IQzwn9VFOGPR9En"
@@ -16,23 +17,41 @@ CLIENT = InferenceHTTPClient(
 def infer_image(image_file):
     """Envia a imagem para o SDK de Inferência da Roboflow usando um arquivo temporário."""
     try:
+        inicio_processo = time.perf_counter()
+        
         # Cria um arquivo temporário
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_file:
             # Escreve o conteúdo do arquivo carregado no arquivo temporário
             image_bytes = image_file.read()
             tmp_file.write(image_bytes)
             temp_file_path = tmp_file.name
-            print(f"Caminho do arquivo temporário em infer_image: {temp_file_path}") # Debugging
-
+            
+        # Mede o tempo de criação do arquivo temporário
+        fim_criacao_arquivo = time.perf_counter()
+        
         # Realiza a inferência na imagem local usando o caminho do arquivo
+        inicio_inferencia = time.perf_counter()
         result = CLIENT.infer(temp_file_path, model_id=ROBOFLOW_MODEL_ID)
-
+        fim_inferencia = time.perf_counter()
+        
         # Limpa o arquivo temporário
         import os
         os.remove(temp_file_path)
-        print(f"Arquivo temporário removido: {temp_file_path}") # Debugging
-
+        
+        # Calcula os tempos totais
+        tempo_total = fim_inferencia - inicio_processo
+        tempo_criacao_arquivo = fim_criacao_arquivo - inicio_processo
+        tempo_api = fim_inferencia - inicio_inferencia
+        
+        st.write(f"""
+        ### Tempos de Processamento
+        - Tempo total do processo: {tempo_total:.3f} segundos
+        - Tempo para criar arquivo temporário: {tempo_criacao_arquivo:.3f} segundos
+        - Tempo da API de inferência: {tempo_api:.3f} segundos
+        """)
+        
         return result
+    
     except Exception as e:
         st.error(f"Erro durante a inferência: {e}")
         return None
@@ -45,10 +64,15 @@ def main():
 
     if uploaded_file is not None:
         try:
+            inicio_processamento = time.perf_counter()
             st.write("### Processando...")
 
             # Realiza a inferência
             results = infer_image(uploaded_file) # Passa o arquivo da imagem
+
+            fim_processamento = time.perf_counter()
+            tempo_total_processamento = fim_processamento - inicio_processamento
+            
 
             st.write("### Imagem Carregada")
             image = Image.open(uploaded_file)
